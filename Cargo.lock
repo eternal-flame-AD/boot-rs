@@ -108,9 +108,6 @@ dependencies = [
 name = "boot-lib"
 version = "0.1.0"
 dependencies = [
- "aes",
- "argon2",
- "cfb8",
  "hex",
 ]
 
