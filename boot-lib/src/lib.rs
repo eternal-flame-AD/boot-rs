@@ -2,11 +2,10 @@
 #![warn(clippy::pedantic)]
 extern crate alloc;
 
-use crate::crypt::DEFAULT_CONFIG;
 use alloc::format;
 use alloc::string::{String, ToString};
 
-pub mod crypt;
+pub mod io;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct BootCfg<'a> {
@@ -94,9 +93,9 @@ impl<'a> BootCfg<'a> {
             })?,
             argon2_salt: argon2_salt
                 .ok_or_else(|| "ERROR: Missing configuration for `argon2_salt`".to_string())?,
-            argon2_mem_cost: argon2_mem_cost.unwrap_or(DEFAULT_CONFIG.mem_cost),
-            argon2_time_cost: argon2_time_cost.unwrap_or(DEFAULT_CONFIG.time_cost),
-            argon2_lanes: argon2_lanes.unwrap_or(DEFAULT_CONFIG.lanes),
+            argon2_mem_cost: argon2_mem_cost.unwrap_or(65536),
+            argon2_time_cost: argon2_time_cost.unwrap_or(10),
+            argon2_lanes: argon2_lanes.unwrap_or(4),
         })
     }
 
@@ -142,9 +141,9 @@ mod tests {
         ];
         assert_eq!(ex_salt, res.argon2_salt);
         assert_eq!(ex_iv, res.aes_initialization_vector);
-        assert_eq!(DEFAULT_CONFIG.lanes, res.argon2_lanes);
-        assert_eq!(DEFAULT_CONFIG.mem_cost, res.argon2_mem_cost);
-        assert_eq!(DEFAULT_CONFIG.time_cost, res.argon2_time_cost);
+        assert_eq!(4, res.argon2_lanes);
+        assert_eq!(65536, res.argon2_mem_cost);
+        assert_eq!(10, res.argon2_time_cost);
         let ser = res.serialize();
         let de = BootCfg::parse_raw(&ser).unwrap();
         assert_eq!(res, de);

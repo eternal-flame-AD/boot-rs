@@ -1,4 +1,5 @@
-use crate::BootCfg;
+#![allow(unused)] // Legacy code only for testing and reference
+
 use aes::cipher::typenum::U32;
 use aes::cipher::KeyIvInit;
 use aes::cipher::{generic_array::GenericArray, AsyncStreamCipher};
@@ -41,17 +42,6 @@ impl Argon2Config {
         custom_base.mem_cost = mem_cost;
         custom_base.time_cost = time_cost;
         Self(custom_base)
-    }
-}
-
-impl<'a> From<&BootCfg<'a>> for Argon2Config {
-    #[inline]
-    fn from(value: &BootCfg<'a>) -> Self {
-        Self(Argon2Cfg {
-            lanes: value.argon2_lanes,
-            mem_cost: value.argon2_mem_cost,
-            time_cost: value.argon2_time_cost,
-        })
     }
 }
 
@@ -132,29 +122,6 @@ pub enum BootDecryptError {
     Other(String),
 }
 
-/// Hashes the password according to the setting specified in `cfg`,
-/// then attempts to decrypt the provided bytes.
-/// # Errors
-/// Key derivation failure.
-/// Bad magic at the beginning of the decrypted content, likely caused by entering the wrong `pass`.
-pub fn hash_and_decrypt_boot_cfg<'a>(
-    src: &'a mut [u8],
-    pass: &[u8],
-    cfg: &BootCfg,
-) -> Result<&'a [u8], BootDecryptError> {
-    let argon2_cfg = Argon2Config(Argon2Cfg {
-        lanes: cfg.argon2_lanes,
-        mem_cost: cfg.argon2_mem_cost,
-        time_cost: cfg.argon2_time_cost,
-    });
-    let key = derive_with_salt(pass, cfg.argon2_salt, &argon2_cfg).map_err(|e| {
-        BootDecryptError::Other(format!(
-            "ERROR: Failed to hash password with provided salt: {e}"
-        ))
-    })?;
-    decrypt_boot_image(src, &key.key, cfg.aes_initialization_vector)
-}
-
 fn decrypt_boot_image<'a>(
     src: &'a mut [u8],
     key: &[u8],
@@ -175,9 +142,61 @@ fn decrypt<'a>(src: &'a mut [u8], key: &[u8], iv: [u8; 16]) -> &'a [u8] {
 
 #[cfg(test)]
 mod tests {
-    use crate::crypt::{
-        decrypt, decrypt_boot_image, encrypt, encrypt_boot_image, BootDecryptError,
-    };
+    use crate::algorithm::{InitParams, KEYSPEC_LEGACY};
+
+    use super::*;
+
+    #[test]
+    fn encrypt_to_legacy() {
+        let key = [0u8; 32];
+        let iv = [0u8; 16];
+        let data = b"Some New Boots For Booting";
+
+        let parms = InitParams::from_slice(&key, Some(&iv), None);
+        let cipher = crate::algorithm::Algorithm::instantiate(KEYSPEC_LEGACY, parms)
+            .expect("cipher should instantiate");
+
+        let encrypted = cipher
+            .encrypt(data.to_vec())
+            .expect("encryption should succeed");
+
+        let seal_bytes = cipher.seal(encrypted.as_ref()).expect("should seal");
+        let seal_len = seal_bytes.as_ref().map(|b| b.len()).unwrap_or(0);
+
+        let mut sealed = Vec::with_capacity(seal_len + data.len());
+        if let Some(detached_seal) = seal_bytes {
+            sealed.extend_from_slice(detached_seal.as_ref());
+        }
+        sealed.extend_from_slice(encrypted.as_ref());
+
+        let decrypted = decrypt_boot_image(sealed.as_mut(), &key, iv).expect("should decrypt");
+
+        assert_eq!(decrypted, data, "decrypted data should match");
+    }
+
+    #[test]
+    fn decrypt_from_legacy() {
+        let key = [0u8; 32];
+        let iv = [0u8; 16];
+        let data = b"Some Legacy Boots For Booting";
+
+        let encrypted = encrypt_boot_image(data, &key, iv);
+
+        let parms = InitParams::from_slice(&key, Some(&iv), None);
+        let cipher = crate::algorithm::Algorithm::instantiate(KEYSPEC_LEGACY, parms)
+            .expect("cipher should instantiate");
+
+        let (seal_secure, unsealed) = cipher.unseal(encrypted.as_ref()).expect("should unseal");
+        assert_eq!(seal_secure, false, "legacy seal in insecure");
+
+        let mut decrypt_buf = unsealed.to_vec();
+
+        let decrypted = cipher
+            .decrypt(decrypt_buf.as_mut())
+            .expect("decryption should succeed");
+
+        assert_eq!(data, decrypted, "decryption should equal encryption");
+    }
 
     #[test]
     fn encrypt_decrypt() {

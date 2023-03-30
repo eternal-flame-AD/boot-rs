@@ -1,0 +1,17 @@
+[package]
+name = "boot-crypt"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+boot-lib = { path = "../boot-lib" }
+aes = { version = "0.8.2", default-features = false }
+cfb8 = { version = "0.8.1", default-features = false }
+argon2 = { version = "0.5.0", default-features = false, features = ["alloc"] }
+hmac = { version = "0.12.1", default-features = false }
+sha2 = { version = "0.10.6", default-features = false }
+generic-array = { version = "0.14.7", default-features = false }
+aes-gcm-siv = { version = "0.11.1", default-features = false, features = ["alloc"] }
+ring = "0.16.20"

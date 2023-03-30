@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+boot-crypt = { path = "../boot-crypt" }
 boot-lib = { path = "../boot-lib" }
 clap = { version = "4.1.11", features = ["derive"] }
 hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
